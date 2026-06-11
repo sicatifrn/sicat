@@ -38,12 +38,6 @@ def registro(
     cpf_raw = suap_data.get("cpf", "") or ""
     cpf_limpo = cpf_raw.replace(".", "").replace("-", "").replace(" ", "")
 
-    if db.query(Usuario).filter(Usuario.cpf == cpf_limpo).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="CPF já cadastrado"
-        )
-    
     if db.query(Usuario).filter(Usuario.matricula == registro_data.matricula).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

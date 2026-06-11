@@ -3,6 +3,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import OperationalError, DatabaseError
 from typing import List, Optional
+from pydantic import ValidationError
 from app.database import get_db
 from app.models import Usuario, FichaCatalografica, StatusFicha, Biblioteca
 from app.schemas import FichaCatalograficaCreate, FichaCatalograficaResponse
@@ -28,8 +29,23 @@ async def criar_ficha(
     usuario: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    ficha_data_dict = json.loads(ficha_json)
-    ficha_data = FichaCatalograficaCreate(**ficha_data_dict)
+    try:
+        ficha_data_dict = json.loads(ficha_json)
+        ficha_data = FichaCatalograficaCreate(**ficha_data_dict)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Dados da ficha inválidos"
+        )
+    except ValidationError as e:
+        erro = e.errors()[0] if e.errors() else {}
+        mensagem = erro.get("msg", "Dados da ficha inválidos")
+        if mensagem.startswith("Value error, "):
+            mensagem = mensagem.replace("Value error, ", "", 1)
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=mensagem
+        )
     
     biblioteca = db.query(Biblioteca).filter(Biblioteca.id == ficha_data.biblioteca_id).first()
     if not biblioteca:
@@ -69,7 +85,7 @@ async def criar_ficha(
         db.add(nova_ficha)
         db.commit()
         db.refresh(nova_ficha)
-    except Exception as e:
+    except Exception:
         db.rollback()
         if pdf_path_str:
             pdf_path = PDF_DIR / pdf_path_str.split('/')[-1]
@@ -79,10 +95,9 @@ async def criar_ficha(
                 except:
                     pass
         
-        error_msg = str(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao criar ficha: {error_msg}"
+            detail="Não foi possível criar a ficha. Verifique os dados e tente novamente."
         )
     
     return nova_ficha

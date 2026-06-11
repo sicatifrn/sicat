@@ -5,9 +5,9 @@ from typing import List
 from pathlib import Path
 from app.database import get_db
 from app.models import Usuario, FichaCatalografica, BibliotecarioBiblioteca, StatusFicha
-from app.schemas import FichaCatalograficaResponse, AprovarNegarRequest
+from app.schemas import FichaCatalograficaLogResponse, FichaCatalograficaResponse, AprovarNegarRequest
 from app.auth_utils import get_bibliotecario_user, get_current_user
-from app.ficha_utils import gerar_imagem_png
+from app.ficha_service import decidir_ficha
 
 router = APIRouter()
 
@@ -34,7 +34,9 @@ def ver_solicitacoes(
 ):
     biblioteca_id = get_biblioteca_do_bibliotecario(bibliotecario, db)
     
-    fichas = db.query(FichaCatalografica).filter(
+    fichas = db.query(FichaCatalografica).options(
+        joinedload(FichaCatalografica.revisor)
+    ).filter(
         FichaCatalografica.biblioteca_id == biblioteca_id
     ).order_by(FichaCatalografica.data_criacao.desc()).all()
     
@@ -50,7 +52,9 @@ def aprovar_negar_solicitacao(
     biblioteca_id = get_biblioteca_do_bibliotecario(bibliotecario, db)
     
     ficha = db.query(FichaCatalografica).options(
-        joinedload(FichaCatalografica.biblioteca)
+        joinedload(FichaCatalografica.biblioteca),
+        joinedload(FichaCatalografica.usuario),
+        joinedload(FichaCatalografica.revisor),
     ).filter(
         FichaCatalografica.id == ficha_id,
         FichaCatalografica.biblioteca_id == biblioteca_id
@@ -62,25 +66,30 @@ def aprovar_negar_solicitacao(
             detail="Ficha não encontrada ou não pertence à sua biblioteca"
         )
     
-    if acao.aprovado:
-        ficha.status = StatusFicha.aprovado
-        try:
-            imagem_png = gerar_imagem_png(ficha)
-            ficha.imagem_png = imagem_png
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Erro ao gerar imagem PNG: {str(e)}"
-            )
-    else:
-        ficha.status = StatusFicha.negado
-    
-    db.commit()
-    db.refresh(ficha)
+    ficha = decidir_ficha(db, ficha, bibliotecario, acao.aprovado, acao.observacao)
     
     return {"message": "Status atualizado com sucesso", "ficha": ficha}
+
+@router.get("/solicitacoes/{ficha_id}/logs", response_model=List[FichaCatalograficaLogResponse])
+def listar_logs_solicitacao(
+    ficha_id: str,
+    bibliotecario: Usuario = Depends(get_bibliotecario_user),
+    db: Session = Depends(get_db)
+):
+    biblioteca_id = get_biblioteca_do_bibliotecario(bibliotecario, db)
+
+    ficha = db.query(FichaCatalografica).filter(
+        FichaCatalografica.id == ficha_id,
+        FichaCatalografica.biblioteca_id == biblioteca_id
+    ).first()
+
+    if not ficha:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ficha não encontrada ou não pertence à sua biblioteca"
+        )
+
+    return sorted(ficha.logs, key=lambda log: log.data_criacao, reverse=True)
 
 @router.get("/solicitacoes/{ficha_id}/pdf")
 def visualizar_pdf(

@@ -3,13 +3,13 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List
 from datetime import datetime
 from app.database import get_db
-from app.models import Usuario, FichaCatalografica, TipoUsuario, StatusFicha, Biblioteca, BibliotecarioBiblioteca
+from app.models import Usuario, FichaCatalografica, TipoUsuario, Biblioteca, BibliotecarioBiblioteca
 from app.schemas import (
-    FichaCatalograficaResponse, UsuarioResponse, AprovarNegarRequest, ModificarTipoRequest,
+    FichaCatalograficaLogResponse, FichaCatalograficaResponse, UsuarioResponse, AprovarNegarRequest, ModificarTipoRequest,
     BibliotecaCreate, BibliotecaResponse, AdicionarBibliotecarioRequest, BibliotecarioBibliotecaResponse
 )
 from app.auth_utils import get_admin_user
-from app.ficha_utils import gerar_imagem_png
+from app.ficha_service import decidir_ficha
 
 router = APIRouter()
 
@@ -18,7 +18,9 @@ def ver_todas_fichas(
     admin: Usuario = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
-    fichas = db.query(FichaCatalografica).all()
+    fichas = db.query(FichaCatalografica).options(
+        joinedload(FichaCatalografica.revisor)
+    ).all()
     return fichas
 
 @router.post("/fichas/{ficha_id}/aprovacao")
@@ -29,7 +31,9 @@ def aprovar_negar_ficha(
     db: Session = Depends(get_db)
 ):
     ficha = db.query(FichaCatalografica).options(
-        joinedload(FichaCatalografica.biblioteca)
+        joinedload(FichaCatalografica.biblioteca),
+        joinedload(FichaCatalografica.usuario),
+        joinedload(FichaCatalografica.revisor),
     ).filter(FichaCatalografica.id == ficha_id).first()
     
     if not ficha:
@@ -38,25 +42,25 @@ def aprovar_negar_ficha(
             detail="Ficha não encontrada"
         )
     
-    if acao.aprovado:
-        ficha.status = StatusFicha.aprovado
-        try:
-            imagem_png = gerar_imagem_png(ficha)
-            ficha.imagem_png = imagem_png
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Erro ao gerar imagem PNG: {str(e)}"
-            )
-    else:
-        ficha.status = StatusFicha.negado
-    
-    db.commit()
-    db.refresh(ficha)
+    ficha = decidir_ficha(db, ficha, admin, acao.aprovado, acao.observacao)
     
     return {"message": "Status atualizado com sucesso", "ficha": ficha}
+
+@router.get("/fichas/{ficha_id}/logs", response_model=List[FichaCatalograficaLogResponse])
+def listar_logs_ficha(
+    ficha_id: str,
+    admin: Usuario = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    ficha = db.query(FichaCatalografica).filter(FichaCatalografica.id == ficha_id).first()
+
+    if not ficha:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ficha não encontrada"
+        )
+
+    return sorted(ficha.logs, key=lambda log: log.data_criacao, reverse=True)
 
 @router.get("/usuarios")
 def ver_todos_usuarios(

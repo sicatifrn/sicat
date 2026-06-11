@@ -9,10 +9,12 @@ from pathlib import Path
 from app.database import engine, Base, settings
 from app.routers import auth, fichas, admin, public, bibliotecarios
 from app.admin_sync import admin_sync_loop
+from app.schema_sync import ensure_database_schema
 
 logging.basicConfig(level=logging.INFO)
 
 Base.metadata.create_all(bind=engine)
+ensure_database_schema(engine)
 
 
 @asynccontextmanager

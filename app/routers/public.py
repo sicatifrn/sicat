@@ -24,7 +24,9 @@ def validar_ficha(id_curto: str, db: Session = Depends(get_db)):
     return {
         "valido": True,
         "id_curto": ficha.id_curto,
-        "data_criacao": ficha.data_criacao.isoformat()
+        "data_criacao": ficha.data_criacao.isoformat(),
+        "data_revisao": ficha.data_revisao.isoformat() if ficha.data_revisao else None,
+        "revisor_nome": ficha.revisor_nome
     }
 
 @router.get("/validar/{id_curto}/imagem")
