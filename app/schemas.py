@@ -91,6 +91,9 @@ class FichaCatalograficaBase(BaseModel):
     palavras_chave: str
     tipo_trabalho: str
 
+class FichaCatalograficaCreate(FichaCatalograficaBase):
+    biblioteca_id: str
+
     @field_validator(
         "autor_nome_completo",
         "orientador_nome_completo",
@@ -173,9 +176,6 @@ class FichaCatalograficaBase(BaseModel):
         self.data_mes = f"{mes:02d}"
         self.data_ano = f"{ano:04d}"
         return self
-
-class FichaCatalograficaCreate(FichaCatalograficaBase):
-    biblioteca_id: str
 
 class FichaCatalograficaResponse(FichaCatalograficaBase):
     id: str
