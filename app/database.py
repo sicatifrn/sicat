@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_hours: int = 72
     suap_api_url: str = "https://suap.ifrn.edu.br"
+    suap_client_id: str = ""
+    suap_client_secret: str = ""
+    suap_redirect_uri: str = "http://localhost:7000/api/auth/suap/callback"
+    suap_oauth_scope: str = "identificacao email documentos_pessoais"
+    frontend_url: str = "http://localhost:5173"
     # Matrículas (separadas por vírgula) que passam a admin ao registar ou ao iniciar sessão.
     admin_matriculas: str = Field(
         default="20221041110028",
