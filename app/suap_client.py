@@ -17,19 +17,33 @@ class SUAPClient:
     def _parse_user_data(self, user_data: dict, matricula_fallback: str = "") -> Dict:
         matricula = (
             user_data.get("matricula")
+            or user_data.get("identificacao")
             or user_data.get("username")
+            or user_data.get("login")
+            or user_data.get("matricula_aluno")
+            or user_data.get("matricula_servidor")
             or matricula_fallback
             or ""
-        ).strip()
+        )
+        matricula = str(matricula).strip()
+
+        nome = (
+            user_data.get("nome_registro")
+            or user_data.get("nome_usual")
+            or user_data.get("nome_social")
+            or user_data.get("nome")
+            or ""
+        )
 
         return {
             "cpf": user_data.get("cpf", ""),
             "matricula": matricula,
-            "nome_completo": user_data.get("nome_registro") or user_data.get("nome", ""),
+            "nome_completo": nome,
             "email": user_data.get("email_preferencial") or user_data.get("email", ""),
             "campus": user_data.get("campus", ""),
             "curso": user_data.get("curso", ""),
             "tipo_usuario": user_data.get("tipo_usuario", ""),
+            "_campos_suap": sorted(user_data.keys()),
         }
 
     def criar_state(self) -> str:

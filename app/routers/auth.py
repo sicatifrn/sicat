@@ -27,9 +27,10 @@ def _provisionar_usuario(suap_data: dict, db: Session) -> Usuario:
     matricula_final = (suap_data.get("matricula", "") or "").strip()
 
     if not matricula_final:
+        campos = suap_data.get("_campos_suap")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Matrícula não retornada pelo SUAP",
+            detail=f"Matrícula não retornada pelo SUAP. Campos recebidos: {campos}",
         )
 
     usuario = db.query(Usuario).filter(Usuario.matricula == matricula_final).first()
@@ -117,8 +118,14 @@ def suap_callback(code: str = "", state: str = "", error: str = "", db: Session 
             status_code=302,
         )
 
-    usuario = _provisionar_usuario(suap_data, db)
-    access_token = _emitir_token(usuario, db)
+    try:
+        usuario = _provisionar_usuario(suap_data, db)
+        access_token = _emitir_token(usuario, db)
+    except HTTPException as exc:
+        return RedirectResponse(
+            url=_frontend_login_url(error=str(exc.detail)),
+            status_code=302,
+        )
 
     return RedirectResponse(
         url=_frontend_login_url(token=access_token, tipo=usuario.tipo.value),
