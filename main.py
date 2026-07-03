@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import logging
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -39,6 +39,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Alguns proxies (ex.: config do CapRover) removem o prefixo /api antes de
+# encaminhar. Este middleware o reconstrói quando ausente, para que as rotas
+# funcionem tanto com o proxy que remove /api quanto no acesso direto (dev).
+_PASSTHROUGH_PREFIXES = ("/api", "/docs", "/redoc", "/openapi.json")
+_STATIC_PREFIXES = ("/public/pdfs", "/public/imagens")
+
+
+@app.middleware("http")
+async def readd_api_prefix(request: Request, call_next):
+    path = request.scope.get("path", "")
+    if (
+        path != "/"
+        and not path.startswith(_PASSTHROUGH_PREFIXES)
+        and not path.startswith(_STATIC_PREFIXES)
+    ):
+        new_path = "/api" + path
+        request.scope["path"] = new_path
+        request.scope["raw_path"] = new_path.encode("latin-1")
+    return await call_next(request)
 
 # Montar diretório estático para servir arquivos
 PUBLIC_DIR = Path(__file__).parent / "public"
