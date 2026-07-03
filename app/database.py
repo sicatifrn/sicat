@@ -10,11 +10,13 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_hours: int = 72
     suap_api_url: str = "https://suap.ifrn.edu.br"
-    suap_client_id: str = ""
-    suap_client_secret: str = ""
-    suap_redirect_uri: str = "http://localhost:7000/api/auth/suap/callback"
+    # Defaults de teste. Se algum dia houver acesso ao painel do CapRover,
+    # basta definir as env vars lá que elas sobrescrevem estes valores.
+    suap_client_id: str = "l6nHv9ox0vtKkFXfvzASSPximbLsFPf1rYEu60Rv"
+    suap_client_secret: str = "Xt0DzcUPiYp0QSxuAyjK91gu9qrHwmZGllzBR6Hewx3KjWAU3matZXTIxK6zu9wRMutANsteT1UevcrBtaJi9CrJZIN3QhCAZCNVkzkUD1emLpx7IGnleXwHsvyFfjwr"
+    suap_redirect_uri: str = "https://sicat.ifrn.edu.br/api/auth/suap/callback"
     suap_oauth_scope: str = "identificacao email documentos_pessoais"
-    frontend_url: str = "http://localhost:5173"
+    frontend_url: str = "https://sicat.ifrn.edu.br"
     # Matrículas (separadas por vírgula) que passam a admin ao registar ou ao iniciar sessão.
     admin_matriculas: str = Field(
         default="20221041110028",
